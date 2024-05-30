@@ -77,7 +77,18 @@ class PropertyStatement extends Statement {
 
     @Override public void evaluate() throws Throwable {
         Property marker = method.getAnnotation(Property.class);
-        int trials = marker.trials();
+
+        // Add ability to override using environment variable
+        String overrideTrials = System.getenv("OverrideNumOfTrials");
+
+        int trials;
+        if (overrideTrials == null || overrideTrials.equals("-1")) {
+            trials = marker.trials();
+        } else {
+            trials = Integer.parseInt(overrideTrials);
+            System.out.println("Trials overridden to " + trials + " for " + method + " in " + testClass);
+        }
+
         MinimalCounterexampleHook hook = marker.onMinimalCounterexample().newInstance();
         ShrinkControl shrinkControl = new ShrinkControl(
             marker.shrink(),
@@ -88,8 +99,15 @@ class PropertyStatement extends Statement {
 
         List<PropertyParameterGenerationContext> params = parameters(trials);
 
-        for (int i = 0; i < trials; ++i)
+        int i;
+        for (i = 0; i < trials; ++i)
             verifyProperty(params, shrinkControl);
+
+        if (overrideTrials != null) {
+            // display trial information
+            System.out.printf("Actual number of trials ran %d of expected %d for %s in %s%n", i, trials, method, testClass);
+            System.out.printf("JSONDATA::{\"overrideTrials\":%d, \"trialsExpected\":%d, \"trialsRan\":%d, \"method\":\"%s\", \"class\":\"%s\"}%n", Long.parseLong(overrideTrials), trials, i, method.getName(), testClass.getName());
+        }
 
         if (successes == 0 && !assumptionViolations.isEmpty()) {
             fail("No values satisfied property assumptions. Violated assumptions: "
