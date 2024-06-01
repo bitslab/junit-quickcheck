@@ -68,6 +68,8 @@ class PropertyStatement extends Statement {
     private final Logger logger;
 
     private int successes;
+    private final String overrideTrials = System.getenv("OverrideNumOfTrials");
+    private int trials;
 
     PropertyStatement(
         FrameworkMethod method,
@@ -106,9 +108,18 @@ class PropertyStatement extends Statement {
                 ))
                 .collect(toList());
 
+        long i = 0;
         Stream<List<SeededValue>> sample = sampler.sample(parameters);
-        for (List<SeededValue> args : (Iterable<List<SeededValue>>) sample::iterator)
+        for (List<SeededValue> args : (Iterable<List<SeededValue>>) sample::iterator) {
+            i++;
             property(args, shrinkControl).verify();
+        }
+
+        if (overrideTrials != null) {
+            // display trial information
+            System.out.printf("Actual number of trials ran %d of expected %d for %s in %s%n", i, trials, method, testClass);
+            System.out.printf("JSONDATA::{\"overrideTrials\":%d, \"trialsExpected\":%d, \"trialsRan\":%d, \"method\":\"%s\", \"class\":\"%s\"}%n", Long.parseLong(overrideTrials), trials, i, method.getName(), testClass.getName());
+        }
 
         if (successes == 0 && !assumptionViolations.isEmpty()) {
             throw new NoValuesSatisfiedPropertyAssumptions(
@@ -189,11 +200,20 @@ class PropertyStatement extends Statement {
     }
 
     private ParameterSampler sampler(Property marker) {
+
+        // Add ability to override using environment variable
+        if (overrideTrials == null || overrideTrials.equals("-1")) {
+            trials = marker.trials();
+        } else {
+            trials = Integer.parseInt(overrideTrials);
+            System.out.println("Trials overridden to " + trials + " for " + method + " in " + testClass);
+        }
+
         switch (marker.mode()) {
             case SAMPLING:
-                return new TupleParameterSampler(marker.trials());
+                return new TupleParameterSampler(trials);
             case EXHAUSTIVE:
-                return new ExhaustiveParameterSampler(marker.trials());
+                return new ExhaustiveParameterSampler(trials);
             default:
                 throw new AssertionError("Don't recognize mode " + marker.mode());
         }
