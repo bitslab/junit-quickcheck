@@ -68,6 +68,16 @@ public class JUnitQuickcheck extends BlockJUnit4ClassRunner {
         super(clazz);
 
         SourceOfRandomness random = new SourceOfRandomness(new Random());
+        final String strOverrideSeed = System.getenv("OverrideSeed");
+        if (strOverrideSeed != null) {
+            long overrideSeed = Long.parseLong(strOverrideSeed);
+            random.setSeed(overrideSeed);
+
+            // display override information
+            System.out.printf("JSONDATA::{\"overrideSeed\":%d}%n", overrideSeed);
+            System.out.println("Seed overridden to " + overrideSeed);
+        }
+
         repo = new GeneratorRepository(random).register(new ServiceLoaderGeneratorSource());
         distro = new GeometricDistribution();
     }
